@@ -1,0 +1,143 @@
+SQL Questions and Answers:
+
+Q1: Select all of the data from the “department” table. How do you select just the “Name” from this table?
+
+
+SELECT name
+FROM departement
+
+
+
+Q2: What does the below query do? How would you rewrite this query so that it includes the number of customers that actually use those titles?
+
+SELECT DISTINCT Title
+FROM contact
+
+
+SELECT Title, COUNT(*)
+FROM contact
+GROUP BY Title
+
+
+
+Q3: Using the ERD for inspiration, join the “customer” table to the “salesterritory” table via the appropriate columns (‘keys’).
+
+
+SELECT *
+FROM customer
+JOIN salesterritory on customer.territoryID = salesterritory.TerritoryID
+
+
+
+Q4: Find some aggregate statistics (COUNT(), SUM(), AVG()...) from the “purchaseorderheader” table for each employeeId. Rename the columns appropriately.
+
+
+SELECT employeeId, COUNT(*) “Count”, SUM(TotalDue) “Summed Total”, AVG(TotalDue) “Average”
+FROM purchaseorderheader
+GROUP BY employeeId
+
+
+ 
+Q5: Find some aggregate statistics (COUNT(), SUM(), AVG()...) from the “purchaseorderheader” table for each employeeID, but also 
+include other employee information (employee information exists in the “employee” table). Rename the columns appropriately.
+
+
+SELECT e.*, sales.*
+FROM employee as e
+JOIN (
+	SELECT EmployeeId, COUNT(*), SUM(TotalDue), AVG(TotalDue)
+	FROM purchaseorderheader
+	GROUP BY employeeId
+) as sales on e.employeeid = sales.EmployeeID
+
+
+
+Q6: How would you rewrite the following query without the HAVING clause?
+
+SELECT TerritoryID, COUNT(*)
+FROM Customer
+WHERE CustomerType <> 'S'
+GROUP BY TerritoryID
+HAVING COUNT(*) >= 1800
+ORDER BY COUNT(*) DESC
+
+
+SELECT *
+FROM (
+SELECT TerritoryID, COUNT(*) as territory_count
+FROM Customer
+WHERE CustomerType <> 'S'
+GROUP BY TerritoryID
+) A
+WHERE territory_count >= 1800
+ORDER BY territory_count DESC
+
+
+
+Q7: By joining the contact table and the salesorderheader table, sum the SubTotal field in salesorderheader to make a Total field for all customers that have a first name that contains the letters ‘ll’ and have no registered middle name, or, customers whose last name contains the letter ‘v’.
+
+Then: filter the data so that the new Total field exceeds 1000, and round the Total field to the nearest 100. Ensure that the data is ordered.
+
+Finally, present the data with a dollars ($) sign (use the CAST()) and CONCAT() functions). Name this field “Total Spent”.
+
+
+SELECT c.firstname, c.middlename, c.lastname, 
+CONCAT('$ ', CAST(ROUND(SUM(s.SubTotal), -2) AS CHAR)) Total
+FROM salesorderheader s
+JOIN contact c ON s.contactid = c.contactid
+WHERE (FirstName LIKE '%ll%'
+AND middleName IS NULL)
+OR LastName LIKE '%v%'
+GROUP BY c.firstname, c.middlename, c.lastname
+HAVING SUM(s.SubTotal) >= 1000
+ORDER BY SUM(s.SubTotal) DESC
+
+
+
+Q8: Unfortunately, PostgreSQL doesn’t like the following query due to the LIMIT statement being embedded into a sub-query, albeit the fact that the SQL statement is quite intuitive. How could you rewrite the following query to obtain the desired result?
+ 
+SELECT AddressLine1, City
+FROM address a
+JOIN customeraddress ca on ca.AddressID = a.AddressID
+WHERE ca.customerID IN (
+	SELECT customerid
+	FROM salesorderheader
+	GROUP BY customerid 
+	ORDER BY COUNT(*) DESC
+	LIMIT 1
+)
+
+
+SELECT AddressLine1, City
+FROM address a
+JOIN customeraddress ca ON ca.AddressID = a.AddressID
+JOIN (
+	SELECT customerid, COUNT(*)
+	FROM salesorderheader
+	GROUP BY customerid 
+	ORDER BY count(*) DESC
+	LIMIT 1
+) A ON A.customerid = ca.customerid
+
+
+
+Q9: Using the SalesOrderHeader table, show how much revenue (TotalDue field) was made and the number of orders made for each range of sales:
+0-99 dollars
+100-999 dollars
+1000-9999 dollars
+10000 dollars
+
+ 
+SELECT Category, COUNT(totaldue), SUM(totaldue)
+FROM (
+   SELECT totaldue,
+	CASE 
+	WHEN totaldue < 100 THEN '0-99'
+	WHEN totaldue >= 100 AND totaldue < 1000 THEN '100-999'
+	WHEN totaldue >= 1000 AND totaldue < 10000 THEN '1000-9999'
+	WHEN totaldue >= 10000 THEN '10000+'
+	ELSE null END "Category"
+   FROM salesorderheader
+) A
+GROUP BY A.Category
+ORDER BY category
